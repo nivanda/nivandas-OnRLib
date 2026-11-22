@@ -8,7 +8,8 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.nivanda.onrlib.item.Ingot;
+import net.nivanda.onrlib.item.Metal;
+import net.minecraft.util.Mth;
 
 import static net.nivanda.onrlib.nivandasOnRLib.MODID;
 
@@ -18,8 +19,9 @@ public class ModDataComponents {
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Float>> METAL =
             DATA_COMPONENTS.registerComponentType("metal", builder -> builder
-                    .persistent(Codec.floatRange(Ingot.MIN_METAL, Ingot.MAX_METAL))
-                    .networkSynchronized(ByteBufCodecs.FLOAT));
+                    // Preserve the legacy float format, but only transport canonical integer IDs.
+                    .persistent(Codec.FLOAT.xmap(Metal::normalizeId, Metal::normalizeId))
+                    .networkSynchronized(ByteBufCodecs.FLOAT.map(Metal::normalizeId, Metal::normalizeId)));
 
     public static final int MIN_MELTING_POINT = 1, MAX_MELTING_POINT = 3;
     public static final int MIN_RESISTANCE = 1, MAX_RESISTANCE = 100;
@@ -47,8 +49,9 @@ public class ModDataComponents {
 
     private static DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> intComponent(String name, int min, int max) {
         return DATA_COMPONENTS.registerComponentType(name, builder -> builder
-                .persistent(Codec.intRange(min, max))
-                .networkSynchronized(ByteBufCodecs.VAR_INT));
+                // Apply identical normalization on encode and decode, not only in the tooltip.
+                .persistent(Codec.INT.xmap(value -> Mth.clamp(value, min, max), value -> Mth.clamp(value, min, max)))
+                .networkSynchronized(ByteBufCodecs.VAR_INT.map(value -> Mth.clamp(value, min, max), value -> Mth.clamp(value, min, max))));
     }
 
     private static DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> boolComponent(String name) {

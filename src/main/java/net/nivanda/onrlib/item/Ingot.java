@@ -15,38 +15,107 @@ import static net.nivanda.onrlib.nivandasOnRLib.MODID;
 
 public class Ingot extends Item {
     public static final float MIN_METAL = 0f;
-    public static final float MAX_METAL = 100f;
+    public static final float MAX_METAL = Metal.MAX_ID;
 
-    public static final List<String> METALS = List.of(
-            "iron",
-            "mithril", "adamantite", "orichalcum", "starsteel", "moonsilver",
-            "sunbronze", "voidiron", "dragonsteel", "aetherium", "shadowsteel",
-            "bloodiron", "frostsilver", "emberite", "stormsteel", "duskgold",
-            "dawnbronze", "verdanite", "azurite", "crimsonite", "nightsilver",
-            "runesteel", "soulsilver", "netherbrass", "skyiron", "deepiron",
-            "thornsteel", "venomite", "glimmerite", "arcanium", "celestium",
-            "infernium", "glacium", "terranite", "tidesteel", "luminite",
-            "obscurium", "pyrosteel", "cryosteel", "galvanite", "phantomsilver",
-            "wraithiron", "spiritbronze", "elderbrass", "ancientite", "primordium",
-            "zephyrite", "quicksteel", "heartgold", "rosesteel", "violium",
-            "indigite", "ceruleum", "viridium", "amberite", "scarletite",
-            "ivorite", "onyxium", "pearlsteel", "coralite", "jadesteel",
-            "opaline", "garnetite", "topazium", "sapphirium", "emeraldine",
-            "rubium", "amethine", "citrinium", "turquoisite", "magmasteel",
-            "lavabronze", "ashiron", "cinderite", "smokesteel", "mistsilver",
-            "cloudsteel", "thunderite", "lightningsteel", "galesilver", "tempestite",
-            "oceanite", "abyssium", "reefbronze", "swampiron", "mossteel",
-            "bloomsilver", "petalite", "honeygold", "wyrmbrass", "griffonsteel",
-            "phoenixite", "hydrasteel", "krakenite", "titanbronze", "giantsteel",
-            "fairysilver", "pixiegold", "demonite", "angelite", "chaosteel"
-    );
+    /** Historical ID order, independent of enum declaration order. */
+    public static final List<String> METALS = Metal.NAMES;
 
     public Ingot(Properties properties) {
         super(properties);
     }
 
+    /** Create a canonical ingot after the mod's registries have finished registering. */
+    public static ItemStack create(Metal metal) {
+        return create(java.util.Objects.requireNonNull(metal, "metal").id());
+    }
+
+    /** Numeric overload retained for integrations using historical IDs. */
+    public static ItemStack create(float metal) {
+        ItemStack stack = new ItemStack(ModItems.INGOT.get());
+        setMetal(stack, metal);
+        return stack;
+    }
+
+    public static void setMetal(ItemStack stack, Metal metal) {
+        setMetal(stack, java.util.Objects.requireNonNull(metal, "metal").id());
+    }
+
+    public static void setMetal(ItemStack stack, float metal) {
+        setOrRemoveDefault(stack, ModDataComponents.METAL.get(), Metal.normalizeId(metal), MIN_METAL);
+    }
+
+    public static void setMeltingPoint(ItemStack stack, int value) {
+        setInt(stack, ModDataComponents.MELTING_POINT.get(), value, ModDataComponents.MIN_MELTING_POINT, ModDataComponents.MAX_MELTING_POINT);
+    }
+
+    public static void setResistance(ItemStack stack, int value) {
+        setInt(stack, ModDataComponents.RESISTANCE.get(), value, ModDataComponents.MIN_RESISTANCE, ModDataComponents.MAX_RESISTANCE);
+    }
+
+    public static void setHeatTransferRate(ItemStack stack, int value) {
+        setInt(stack, ModDataComponents.HEAT_TRANSFER_RATE.get(), value, ModDataComponents.MIN_HEAT_TRANSFER_RATE, ModDataComponents.MAX_HEAT_TRANSFER_RATE);
+    }
+
+    public static void setWeight(ItemStack stack, int value) {
+        setInt(stack, ModDataComponents.WEIGHT.get(), value, ModDataComponents.MIN_WEIGHT, ModDataComponents.MAX_WEIGHT);
+    }
+
+    public static void setMagnetic(ItemStack stack, boolean value) {
+        setOrRemoveDefault(stack, ModDataComponents.IS_MAGNETIC.get(), value, false);
+    }
+
+    public static void setConductive(ItemStack stack, boolean value) {
+        setOrRemoveDefault(stack, ModDataComponents.IS_CONDUCTIVE.get(), value, false);
+    }
+
+    public static void setArcanePowers(ItemStack stack, boolean value) {
+        setOrRemoveDefault(stack, ModDataComponents.HAS_ARCANE_POWERS.get(), value, false);
+    }
+
+    public static void setRadioactive(ItemStack stack, boolean value) {
+        setOrRemoveDefault(stack, ModDataComponents.IS_RADIOACTIVE.get(), value, false);
+    }
+
+    public static void setStable(ItemStack stack, boolean value) {
+        setOrRemoveDefault(stack, ModDataComponents.IS_STABLE.get(), value, false);
+    }
+
+    private static void setInt(ItemStack stack, DataComponentType<Integer> type, int value, int min, int max) {
+        setOrRemoveDefault(stack, type, Mth.clamp(value, min, max), min);
+    }
+
+    private static <T> void setOrRemoveDefault(ItemStack stack, DataComponentType<T> type, T value, T defaultValue) {
+        // Missing components already mean the default. Avoid visually identical, unstackable forms.
+        if (value.equals(defaultValue)) stack.remove(type);
+        else stack.set(type, value);
+    }
+
+    /** Repair stacks constructed by integrations using raw ItemStack#set before inventory insertion. */
+    public static void normalizeComponents(ItemStack stack) {
+        if (!(stack.getItem() instanceof Ingot)) throw new IllegalArgumentException("Expected an OnRLib ingot");
+        setMetal(stack, getMetal(stack));
+        setMeltingPoint(stack, getMeltingPoint(stack));
+        setResistance(stack, getResistance(stack));
+        setHeatTransferRate(stack, getHeatTransferRate(stack));
+        setWeight(stack, getWeight(stack));
+        normalizeBoolean(stack, ModDataComponents.IS_MAGNETIC.get());
+        normalizeBoolean(stack, ModDataComponents.IS_CONDUCTIVE.get());
+        normalizeBoolean(stack, ModDataComponents.HAS_ARCANE_POWERS.get());
+        normalizeBoolean(stack, ModDataComponents.IS_RADIOACTIVE.get());
+        normalizeBoolean(stack, ModDataComponents.IS_STABLE.get());
+    }
+
+    private static void normalizeBoolean(ItemStack stack, DataComponentType<Boolean> type) {
+        setOrRemoveDefault(stack, type, stack.getOrDefault(type, false), false);
+    }
+
+    @Override
+    public void verifyComponentsAfterLoad(ItemStack stack) {
+        normalizeComponents(stack);
+    }
+
     public static float getMetal(ItemStack stack) {
-        return Mth.clamp(stack.getOrDefault(ModDataComponents.METAL.get(), MIN_METAL), MIN_METAL, MAX_METAL);
+        return Metal.normalizeId(stack.getOrDefault(ModDataComponents.METAL.get(), MIN_METAL));
     }
 
     public static int getMeltingPoint(ItemStack stack) {
@@ -138,7 +207,7 @@ public class Ingot extends Item {
     }
 
     public static String getMetalName(ItemStack stack) {
-        return METALS.get(Mth.clamp(Mth.floor(getMetal(stack)), 0, METALS.size() - 1));
+        return Metal.byId((int) getMetal(stack)).serializedName();
     }
 
     @Override

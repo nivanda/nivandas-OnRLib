@@ -1,0 +1,10 @@
+// Optional development-only GameTests. Plain builds do not include these classes/resources.
+allprojects {
+    afterEvaluate {
+        sourceSets.main.java.srcDir('src/gametest/java')
+        sourceSets.main.resources.srcDir('src/gametest/resources')
+        neoForge.runs.gameTestServer {
+            systemProperty 'onrlib.regression.report', new File(rootDir, 'build/reports/gametest.xml').absolutePath
+        }
+    }
+}
